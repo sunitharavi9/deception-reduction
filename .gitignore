@@ -1,5 +1,6 @@
 data/evals/machiavelli/game_data/
 .venv/
-outputs/
+.venv-vllm/
+myenv/
 __pycache__/
 .venv-vllm/

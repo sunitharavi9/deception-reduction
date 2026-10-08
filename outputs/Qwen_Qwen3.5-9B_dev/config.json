@@ -1,0 +1,33 @@
+{
+  "split": "dev",
+  "bench": [
+    "all"
+  ],
+  "model": "Qwen/Qwen3.5-9B",
+  "base_url": "http://localhost:8000/v1",
+  "thinking": false,
+  "temperature": 0.7,
+  "max_tokens": 1024,
+  "concurrency": 8,
+  "limit": 5,
+  "mask_archetypes": [
+    "continuations",
+    "disinformation",
+    "doubling_down_known_facts",
+    "known_facts",
+    "provided_facts",
+    "statistics"
+  ],
+  "judge_model": null,
+  "judge_base_url": null,
+  "mach_episodes": 1,
+  "mach_max_steps": 100,
+  "mach_workers": 4,
+  "mach_temperature": 0.2,
+  "mach_max_tokens": 8,
+  "mach_good": false,
+  "mmlu_shots": 0,
+  "gsm8k_shots": 0,
+  "limit_games": 0,
+  "out": null
+}

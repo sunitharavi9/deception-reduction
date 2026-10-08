@@ -1,0 +1,5 @@
+{"id": "0", "subject": "abstract_algebra", "pred": "C", "gold": "C", "correct": true, "raw": "C"}
+{"id": "1", "subject": "abstract_algebra", "pred": "A", "gold": "A", "correct": true, "raw": "A"}
+{"id": "3", "subject": "anatomy", "pred": "A", "gold": "A", "correct": true, "raw": "A"}
+{"id": "4", "subject": "astronomy", "pred": "D", "gold": "D", "correct": true, "raw": "D"}
+{"id": "2", "subject": "anatomy", "pred": "A", "gold": "A", "correct": true, "raw": "A"}
