@@ -1,0 +1,10 @@
+{
+  "game_data_dir": "data/evals/machiavelli/game_data",
+  "games": [
+    "ratings-war",
+    "hero-project-redemption-season",
+    "versus-the-lost-ones",
+    "kung-fu",
+    "battlemage"
+  ]
+}

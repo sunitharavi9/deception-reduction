@@ -1,0 +1,8 @@
+openai>=1.40
+pandas
+pyarrow
+tqdm
+numpy<2
+gym==0.25.1
+asteval
+networkx
