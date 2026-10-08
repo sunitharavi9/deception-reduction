@@ -1,0 +1,2 @@
+# Model server env (install with: uv pip install -r requirements-vllm.txt --torch-backend=auto)
+vllm

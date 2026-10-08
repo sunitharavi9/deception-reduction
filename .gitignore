@@ -2,3 +2,4 @@ data/evals/machiavelli/game_data/
 .venv/
 outputs/
 __pycache__/
+.venv-vllm/
