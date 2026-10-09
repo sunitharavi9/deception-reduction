@@ -61,36 +61,56 @@ machine, add `--base-url http://<host>:8000/v1`. MASK and MT-Bench are scored by
 defaults to the model under test; pass `--judge-model` / `--judge-base-url` for a stronger judge.
 
 ### Running the model and a separate judge together (all 8 GPUs, no quantization)
-Judge on GPUs 6-7 (bf16, ~64 GB split with tensor parallelism); the 9B model (~18 GB) is replicated
-on GPUs 0-5 with data parallelism behind a single endpoint, so requests are load-balanced across 6 replicas.
-Start the model first and wait until it is up, then start the judge (separate terminals).
-```bash
-# 1) model under test: 6 replicas on GPUs 0-5
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vllm serve Qwen/Qwen3.5-9B --port 8000 \
-  --data-parallel-size 6 --gpu-memory-utilization 0.90 --max-model-len 16384
+MASK is scored with the official MASK pipeline (judge prompts and belief/honesty aggregation from
+`centerforaisafety/mask`, see `scripts/mask_official.py`). The judge should be a different, strong model from
+the one under test; we use a non-Qwen judge so it is not the same family as the model being evaluated.
 
-# 2) judge on GPUs 6-7
-CUDA_VISIBLE_DEVICES=6,7 vllm serve Qwen/Qwen2.5-32B-Instruct --port 8001 \
-  --tensor-parallel-size 2 --gpu-memory-utilization 0.90 --max-model-len 16384
+Layout: the 9B model is replicated on GPUs 0-3 (data parallel); the judge, Llama-3.3-70B-Instruct (~140 GB in
+bf16), is split over GPUs 4-7 (tensor parallel). Llama is gated: accept the license on Hugging Face and
+`export HF_TOKEN=...` first. Start the model first and wait until it is up, then the judge (separate terminals).
+```bash
+# 1) model under test: 4 replicas on GPUs 0-3
+CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve Qwen/Qwen3.5-9B --port 8000 \
+  --data-parallel-size 4 --gpu-memory-utilization 0.90 --max-model-len 16384
+
+# 2) judge on GPUs 4-7
+CUDA_VISIBLE_DEVICES=4,5,6,7 vllm serve meta-llama/Llama-3.3-70B-Instruct --port 8001 \
+  --tensor-parallel-size 4 --gpu-memory-utilization 0.90 --max-model-len 16384
 
 # 3) baseline evals: all five benchmarks, full test split
 python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B \
   --base-url http://localhost:8000/v1 \
-  --judge-model Qwen/Qwen2.5-32B-Instruct --judge-base-url http://localhost:8001/v1 \
-  --concurrency 96 --mach-workers 30 \
+  --judge-model meta-llama/Llama-3.3-70B-Instruct --judge-base-url http://localhost:8001/v1 \
+  --concurrency 64 --mach-workers 30 \
   --out outputs/baseline_full_test
 ```
+No gated access? Use an ungated non-Qwen judge instead, e.g. `mistralai/Mistral-Small-3.2-24B-Instruct-2506`
+(~48 GB) on two GPUs: `CUDA_VISIBLE_DEVICES=6,7 vllm serve mistralai/Mistral-Small-3.2-24B-Instruct-2506 --port 8001 --tensor-parallel-size 2 ...`
+and give the model GPUs 0-5 with `--data-parallel-size 6`.
+
 `--concurrency` is the number of parallel MASK / MMLU / GSM8K / MT-Bench requests; `--mach-workers` is the
 number of Machiavelli games played in parallel (one process per game, 30 test games). Lower either if the
-judge (only 2 GPUs) becomes the bottleneck. Reruns with the same `--out` resume from cached rows.
+judge becomes the bottleneck. Reruns with the same `--out` resume from cached rows.
+
+**Re-judging existing generations.** Rows in `--out` generated earlier (or scored with a different judge) keep
+their generations; only the judge step is repeated. To rescore a finished run with a new judge, you only need
+the judge server up:
+```bash
+python scripts/run_evals.py --split test --bench mask --model Qwen/Qwen3.5-9B \
+  --judge-model meta-llama/Llama-3.3-70B-Instruct --judge-base-url http://localhost:8001/v1 \
+  --out outputs/baseline_full_test
+```
+Rows already scored are skipped unless you pass `--rejudge`, which re-runs the judge on every cached
+generation (use it when switching judge models; copy the old folder to a new `--out` first if you want to keep
+both sets of scores).
 
 ### Experiment 1: honesty "developer system prompt" (MASK paper §5.2, App. A.6)
 Same command as the baseline, plus `--developer-prompt` (prepended to MASK pressure prompts only; belief
 elicitation is unchanged). Use a new `--out` so it doesn't resume from baseline rows.
 ```bash
 python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B --bench mask --developer-prompt \
-  --base-url http://localhost:8000/v1 --judge-model Qwen/Qwen2.5-32B-Instruct \
-  --judge-base-url http://localhost:8001/v1 --concurrency 96 --out outputs/devprompt_mask_test
+  --base-url http://localhost:8000/v1 --judge-model meta-llama/Llama-3.3-70B-Instruct \
+  --judge-base-url http://localhost:8001/v1 --concurrency 64 --out outputs/devprompt_mask_test
 ```
 
 ### Experiment 2: LoRRA
