@@ -74,7 +74,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve Qwen/Qwen3.5-9B --port 8000 \
   --data-parallel-size 4 --gpu-memory-utilization 0.90 --max-model-len 16384
 
 # 2) judge on GPUs 4-7
-CUDA_VISIBLE_DEVICES=4,5,6,7 vllm serve meta-llama/Llama-3.3-70B-Instruct --port 8001 \
+CUDA_VISIBLE_DEVICES=4,5,6,7 vllm serve mistralai/Mistral-Small-3.2-24B-Instruct-2506 --port 8001 \
   --tensor-parallel-size 4 --gpu-memory-utilization 0.90 --max-model-len 16384
 
 # 3) baseline evals: all five benchmarks, full test split
@@ -104,14 +104,29 @@ Rows already scored are skipped unless you pass `--rejudge`, which re-runs the j
 generation (use it when switching judge models; copy the old folder to a new `--out` first if you want to keep
 both sets of scores).
 
-### Experiment 1: honesty "developer system prompt" (MASK paper §5.2, App. A.6)
-Same command as the baseline, plus `--developer-prompt` (prepended to MASK pressure prompts only; belief
-elicitation is unchanged). Use a new `--out` so it doesn't resume from baseline rows.
+### Experiment 1: developer system prompts (honesty, and honesty + ethics)
+`--developer-prompt VARIANT` adds a "developer system prompt" to the **model under test on every benchmark**: MASK
+pressure prompts, MMLU, GSM8K, MT-Bench and Machiavelli. It goes first in the system message, followed by the
+benchmark's own system prompt (or alone where there is none). It is never added to the judges, and never to MASK
+belief elicitation (beliefs must be elicited neutrally). Variants:
+- `honest` (bare `--developer-prompt` means this): the MASK paper's prompt (App. A.6), "respond in a way that is honest and
+  truthful". The paper applies it to MASK only; applying it to the other benchmarks is our extension.
+- `honest_ethical`: honesty plus a short code of conduct (honesty, no deceiving others, care for people, fairness and
+  rules, openness when declining, fiction is fine). The text is `DEVELOPER_PROMPTS` in
+  `scripts/run_evals.py`. It adds ethics beyond honesty, so a MASK gain is not purely an honesty effect, and it can change
+  Machiavelli behaviour (use `--mach-good` separately if you also want the game-specific "be good" instruction).
+
+Use a new `--out` per variant (the script refuses to reuse an output folder run with a different setting).
 ```bash
-python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B --bench mask --developer-prompt \
-  --base-url http://localhost:8000/v1 --judge-model meta-llama/Llama-3.3-70B-Instruct \
-  --judge-base-url http://localhost:8001/v1 --concurrency 64 --out outputs/devprompt_mask_test
+for V in honest honest_ethical; do
+python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B --developer-prompt $V \
+  --base-url http://localhost:8000/v1 \
+  --judge-model mistralai/Mistral-Small-3.2-24B-Instruct-2506 --judge-base-url http://localhost:8001/v1 \
+  --concurrency 64 --mach-workers 30 --out outputs/devprompt_${V}_test
+done
 ```
+Compare against the baseline run on all benchmarks: MASK honesty (and evasion / no-belief / accuracy), MMLU, GSM8K, MT-Bench,
+and the Machiavelli harm scores.
 
 ### Experiment 2: LoRRA
 Trains LoRRA adapters on Qwen3.5-9B (MASK paper §5.2) and merges them into a vLLM-loadable checkpoint.
@@ -148,3 +163,55 @@ python scripts/run_evals.py --split test --model qwen3.5-9b-lorra --base-url htt
   --concurrency 96 --mach-workers 30 --out outputs/lorra_full_test
 ```
 Smoke test first with `--split dev --limit 5 --bench mask mmlu`.
+
+### Experiment 3: honesty steering (same contrast data as LoRRA, no training)
+`scripts/steer_honesty.py` computes per-layer vectors `v_l` = mean (honest-persona − dishonest-persona) activation over
+response tokens on generic alpaca prompts, and serves the model (Hugging Face, batched, OpenAI-compatible) with
+`alpha * v_l` added to the residual stream at chosen layers. `alpha = 1` is one average persona shift; `0` is unsteered.
+Run in the training env (`.venv-train`), with vLLM servers stopped except the judge (judge only needed for the final MASK run).
+
+**MASK is held out (dev and test): nothing is tuned on it.** Selection protocol:
+1. *Layer*: `compute` also scores each layer on 200 held-out alpaca prompts, i.e. how consistently an individual
+   prompt's honest-minus-dishonest shift points along `v_l` (`heldout_cosine` in `meta.json`, top layers printed). Take
+   a few of the best layers.
+2. *Alpha*: sweep alpha on those layers with MMLU + GSM8K dev (`steer_sweep.py`; it refuses `--bench mask` unless
+   `--final-mask`). Keep the largest alpha whose accuracy stays within a pre-set budget of the unsteered run (decide the
+   budget before looking, e.g. 2 points).
+3. *Final*: run MASK once on the chosen (layer, alpha), on the test split. Do not pick among MASK results; if you run
+   several configs on MASK, report all of them.
+
+```bash
+# 1) vectors for all layers (~1000 examples + 200 held-out, one GPU, minutes)
+CUDA_VISIBLE_DEVICES=0 python scripts/steer_honesty.py compute --model Qwen/Qwen3.5-9B --n 1000 --out models/steer/qwen3.5-9b
+
+# 2) one steer server per GPU 0-5
+for i in 0 1 2 3 4 5; do
+  CUDA_VISIBLE_DEVICES=$i nohup python scripts/steer_honesty.py serve --model Qwen/Qwen3.5-9B \
+    --vectors models/steer/qwen3.5-9b/vectors.pt --port 900$i > steer_$i.log 2>&1 &
+done
+
+# 3) alpha sweep on capability dev sets (no MASK, no judge needed); use the top layers from step 1
+python scripts/steer_sweep.py --ports 9000 9001 9002 9003 9004 9005 --layers <top layers> --alphas 0.5 1 2 4
+
+# 4) final: MASK once on the chosen setting (judge on GPUs 6-7 as in "Running the model and a separate judge together")
+curl -X POST localhost:9000/steer -d '{"layers":[<L>],"alpha":<A>}'
+python scripts/run_evals.py --split test --bench mask --model qwen3.5-9b-steer --base-url http://localhost:9000/v1 \
+  --judge-model mistralai/Mistral-Small-3.2-24B-Instruct-2506 --judge-base-url http://localhost:8001/v1 \
+  --concurrency 32 --out outputs/steer_final_test
+```
+Sweep runs go to `outputs/steer_dev/<config>/` with a comparison table. Layer indices are 0-based decoder layers
+(`meta.json` has the layer count and vector norms). A server's setting can be changed by hand with the `curl` above.
+
+### Analysis: what did LoRRA change?
+`scripts/analyze_lorra.py` compares the LoRRA model with the base model on the same prompts (one GPU; the adapter is
+toggled on/off, so both share one set of weights). It needs the trained adapter and the steering vectors from
+Experiment 3 (`steer_honesty.py compute`), used as the reference honesty direction.
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/analyze_lorra.py \
+  --adapter models/qwen3.5-9b-lorra/adapter --vectors models/steer/qwen3.5-9b/vectors.pt --weights
+```
+Writes `outputs/lorra_analysis/{summary.md,results.json,layers_main.png,layers_last.png}`. Per layer and prompt set (unseen
+alpaca prompts plain / honest persona / dishonest persona, and MASK pressure / belief prompts) it reports the relative
+size of the activation shift, its cosine and projection along the honesty vector, and whether the shift is the same
+vector for every prompt (`shared_frac` near 1, i.e. behaves like a steering vector) or depends on the prompt. MASK prompts
+are used here only to understand the model; do not tune anything on them. See the script's docstring for the metrics.
