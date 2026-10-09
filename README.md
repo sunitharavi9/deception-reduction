@@ -1,4 +1,6 @@
-# deception-reduction
+# Reducing Deception in Qwen3.5-9B
+
+This repo contains the code to replicate the experiments described in the report. 
 
 ## Setup
 
