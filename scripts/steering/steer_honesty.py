@@ -1,4 +1,4 @@
-"""Honesty activation steering with the same contrast data as LoRRA (scripts/train_lorra.py).
+"""Honesty activation steering with the same contrast data as LoRRA (scripts/training/train_lorra.py).
 
   compute  per-layer steering vectors  v_l = mean over response tokens of Act_l(honest persona) - Act_l(dishonest persona)
            on generic alpaca instructions (no MASK data).
@@ -6,8 +6,8 @@
            output of chosen layer(s) at every position. Layers/alpha can be changed at runtime with POST /steer, so
            one loaded model can be swept over many settings.
 
-    python scripts/steer_honesty.py compute --model Qwen/Qwen3.5-9B --n 1000 --out models/steer/qwen3.5-9b
-    CUDA_VISIBLE_DEVICES=0 python scripts/steer_honesty.py serve --model Qwen/Qwen3.5-9B \\
+    python scripts/steering/steer_honesty.py compute --model Qwen/Qwen3.5-9B --n 1000 --out models/steer/qwen3.5-9b
+    CUDA_VISIBLE_DEVICES=0 python scripts/steering/steer_honesty.py serve --model Qwen/Qwen3.5-9B \\
         --vectors models/steer/qwen3.5-9b/vectors.pt --port 9000
     curl -X POST localhost:9000/steer -d '{"layers": [16], "alpha": 2.0}'
 

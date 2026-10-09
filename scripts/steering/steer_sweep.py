@@ -2,7 +2,7 @@
 MASK is a hold-out benchmark, so it is NOT run by default (--bench defaults to mmlu gsm8k); use it only on the final
 setting, with --bench mask --final-mask.
 
-    python scripts/steer_sweep.py --ports 9000 9001 9002 9003 9004 9005 --layers 12 16 20 --alphas 0.5 1 2
+    python scripts/steering/steer_sweep.py --ports 9000 9001 9002 9003 9004 9005 --layers 12 16 20 --alphas 0.5 1 2
 
 Each server must already be running (`steer_honesty.py serve --port <p>`). The sweep switches a server's setting with
 POST /steer, runs `run_evals.py --split dev` into <out-root>/L<layers>_a<alpha>/, then prints a comparison table.
@@ -18,7 +18,7 @@ import threading
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def post(url, obj):
@@ -97,7 +97,7 @@ def main():
             out = out_root / tag(layers, alpha)
             post(f"{base}/steer", {"layers": layers, "alpha": alpha})
             print(f"[:{port}] {tag(layers, alpha)} -> {out}", flush=True)
-            cmd = [sys.executable, str(ROOT / "scripts" / "run_evals.py"), "--split", a.split, "--bench", *a.bench,
+            cmd = [sys.executable, str(ROOT / "scripts" / "evals" / "run_evals.py"), "--split", a.split, "--bench", *a.bench,
                    "--model", a.model_name, "--base-url", f"{base}/v1",
                    "--concurrency", str(a.concurrency), "--out", str(out)]
             if a.judge_model:

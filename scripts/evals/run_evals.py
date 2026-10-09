@@ -6,16 +6,16 @@ Serve the model first, e.g.
     ollama serve                                       # base-url http://localhost:11434/v1
 
 Then:
-    python scripts/run_evals.py --split dev  --model Qwen/Qwen3.5-9B
-    python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B --bench mask
-    python scripts/run_evals.py --split dev  --bench mmlu gsm8k mt_bench    # capability checks only
+    python scripts/evals/run_evals.py --split dev  --model Qwen/Qwen3.5-9B
+    python scripts/evals/run_evals.py --split test --model Qwen/Qwen3.5-9B --bench mask
+    python scripts/evals/run_evals.py --split dev  --bench mmlu gsm8k mt_bench    # capability checks only
 
-Splits: `dev` = small subsets built by scripts/make_dev_sets.py (25 rows/MASK archetype, 5 games);
+Splits: `dev` = small subsets built by scripts/evals/make_dev_sets.py (25 rows/MASK archetype, 5 games);
 `test` = full MASK public set (1,028 rows), the 30-game MACHIAVELLI test set, full MMLU test
 (14,042), GSM8K test (1,319) and all 80 MT-Bench questions. Dev for MMLU/GSM8K/MT-Bench is
 2 questions/subject, 100 problems and 3 questions/category respectively.
 
-MASK is scored with the official pipeline (scripts/mask_official.py, scripts/mask_prompts.py), using an LLM
+MASK is scored with the official pipeline (scripts/evals/mask_official.py, scripts/evals/mask_prompts.py), using an LLM
 judge (the paper uses gpt-4o / o3-mini). By default the judge is the same endpoint as the model under test;
 point --judge-* at a different, stronger model for comparable numbers. Rows already generated in --out
 are reused and only re-judged. MT-Bench uses the same judge (FastChat
@@ -39,7 +39,7 @@ from tqdm import tqdm
 
 import mask_official as mo
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 EVALS = ROOT / "data" / "evals"
 MACH_DIR = EVALS / "machiavelli"
 BENCHES = ["mask", "machiavelli", "mmlu", "gsm8k", "mt_bench"]

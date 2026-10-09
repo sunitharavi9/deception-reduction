@@ -21,6 +21,6 @@ cat <<MSG
 Done. Add to ~/.bashrc:
   export HF_HOME=$HF_HOME UV_CACHE_DIR=$UV_CACHE_DIR
 Server:  source $DATA_ROOT/.venv-vllm/bin/activate && vllm serve Qwen/Qwen3.5-9B --port 8000
-Evals:   source $DATA_ROOT/.venv/bin/activate && python scripts/run_evals.py --split dev
+Evals:   source $DATA_ROOT/.venv/bin/activate && python scripts/evals/run_evals.py --split dev
 MACHIAVELLI game_data (3.4 GB) is gitignored: rsync data/evals/machiavelli/game_data or download it per its README.
 MSG

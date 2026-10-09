@@ -4,11 +4,11 @@ Same setup as train_lorra.py: each rank holds a full bf16 model, trains on its s
 the LoRA gradients are all-reduced. Each stage saves a merged, vLLM-loadable checkpoint plus adapter/.
 
     # stage 1: SFT on sft.jsonl (honesty/ethics chosen replies + Tulu 3) from the base model
-    torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage sft
+    torchrun --standalone --nproc_per_node=8 scripts/training/train_sft_dpo.py --stage sft
     # stage 2: DPO on dpo.jsonl, starting from (and referenced against) the merged SFT model
-    torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage dpo
+    torchrun --standalone --nproc_per_node=8 scripts/training/train_sft_dpo.py --stage dpo
     # DPO straight from the base model (ablation: no SFT stage)
-    torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage dpo --model Qwen/Qwen3.5-9B \
+    torchrun --standalone --nproc_per_node=8 scripts/training/train_sft_dpo.py --stage dpo --model Qwen/Qwen3.5-9B \
         --out-dir models/qwen3.5-9b-dpo-only
 
 Prompts are rendered exactly as at eval time (chat template, enable_thinking=False, generation prompt) and only the
@@ -30,7 +30,7 @@ import torch.nn.functional as F
 from peft import LoraConfig, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULTS = {  # stage -> (start model, data file, out dir, lr, global batch, micro batch)
     "sft": ("Qwen/Qwen3.5-9B", "sft.jsonl", "models/qwen3.5-9b-sft", 1e-4, 64, 2),
     "dpo": ("models/qwen3.5-9b-sft", "dpo.jsonl", "models/qwen3.5-9b-sft-dpo", 2e-5, 64, 1),

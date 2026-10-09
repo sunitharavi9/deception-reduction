@@ -19,9 +19,9 @@ Pipeline per scenario (teacher and judge are any OpenAI-compatible endpoints, e.
      archetypes); a scenario is kept if its honest reply passes; a lie/evasive reply is kept only if labeled as such
 
     # teacher + judge: serve a model that is NOT the MASK eval judge (see below), e.g. on :8002
-    python scripts/gen_synthetic_honesty.py --n 3000 \
+    python scripts/data_prep/gen_synthetic_honesty.py --n 3000 \
         --teacher-model Qwen/Qwen2.5-32B-Instruct --teacher-base-url http://localhost:8002/v1
-    python scripts/gen_synthetic_honesty.py --n 20 --mock        # no server: checks the plumbing only
+    python scripts/data_prep/gen_synthetic_honesty.py --n 20 --mock        # no server: checks the plumbing only
 
 Teacher and judge must not be the model that scores MASK in the evals (--eval-judge-model, default Mistral-Small-3.2):
 the replies are filtered by the teacher/judge, so using the eval judge would train the model toward that judge's
@@ -43,10 +43,10 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # decontam
+sys.path.insert(0, str(ROOT / "scripts" / "evals"))         # run_evals (LLM client)
 from decontam import MaskTopicFilter  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent.parent
 
 ARCHETYPES = {
     # share, description given to the teacher

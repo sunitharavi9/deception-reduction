@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-EVALS = Path(__file__).resolve().parent.parent / "data" / "evals"
+EVALS = Path(__file__).resolve().parents[2] / "data" / "evals"
 DEV = EVALS / "dev"
 SEED = 0
 MASK_PER_SPLIT = 25

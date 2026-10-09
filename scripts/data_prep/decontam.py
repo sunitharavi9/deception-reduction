@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 EVALS = ROOT / "data" / "evals"
 CANARY_RE = re.compile(r"canary GUID|BENCHMARK DATA SHOULD NEVER APPEAR", re.I)
 WORD_RE = re.compile(r"[a-z0-9]+")

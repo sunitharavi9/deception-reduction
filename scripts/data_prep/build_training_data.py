@@ -14,16 +14,16 @@ Sources (all downloaded from the Hugging Face Hub on first use):
     goal", not "give up on the goal" (which is what cost LoRRA game.score).
   * DolusChat (AlignmentResearch/DolusChat): paired truthful vs deceptive replies in context. The field
     layout is detected; run `--inspect doluschat` first and pass --dolus-fields if detection fails.
-  * Synthetic anti-evasion scenarios from scripts/gen_synthetic_honesty.py (two DPO pairs per scenario:
+  * Synthetic anti-evasion scenarios from scripts/data_prep/gen_synthetic_honesty.py (two DPO pairs per scenario:
     honest-and-direct vs lie, honest-and-direct vs evasive).
   * Tulu 3 SFT mixture (allenai/tulu-3-sft-mixture) for capability retention, SFT only.
 
-Every example is checked against the eval sets (13-gram overlap + MASK canary, see scripts/decontam.py).
+Every example is checked against the eval sets (13-gram overlap + MASK canary, see scripts/data_prep/decontam.py).
 
-    python scripts/build_training_data.py --inspect doluschat          # look at a source's fields first
-    python scripts/build_training_data.py                              # defaults below
-    python scripts/build_training_data.py --n-tulu 0 --no-doluschat     # e.g. an ablation without them
-    python scripts/build_training_data.py --tulu-only                  # control: the Tulu part alone (data/train/control_tulu/)
+    python scripts/data_prep/build_training_data.py --inspect doluschat          # look at a source's fields first
+    python scripts/data_prep/build_training_data.py                              # defaults below
+    python scripts/data_prep/build_training_data.py --n-tulu 0 --no-doluschat     # e.g. an ablation without them
+    python scripts/data_prep/build_training_data.py --tulu-only                  # control: the Tulu part alone (data/train/control_tulu/)
 """
 import argparse
 import hashlib
@@ -36,8 +36,8 @@ from pathlib import Path
 
 from decontam import EvalIndex, example_text
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts"))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 MORAL_ID = "demelin/moral_stories"
 DOLUS_ID = "AlignmentResearch/DolusChat"
@@ -323,7 +323,7 @@ def main():
         s, d = synthetic_pairs(a.synthetic, a.n_synthetic)
         sft += s; dpo += d
     elif a.synthetic:
-        print(f"[warn] no synthetic file at {a.synthetic}; run scripts/gen_synthetic_honesty.py first")
+        print(f"[warn] no synthetic file at {a.synthetic}; run scripts/data_prep/gen_synthetic_honesty.py first")
     sft += tulu(a.n_tulu, rng, a.seed, set(a.tulu_exclude), a.tulu_max_chars)
 
     print("indexing eval sets for decontamination ...")

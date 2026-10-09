@@ -4,9 +4,9 @@ Script version of notebooks/lorra_honesty.ipynb (same objective and config). Eac
 bf16 copy of the model and trains on its own slice of every global batch; only the (small) LoRA gradients
 are all-reduced. Frozen-model activations (the targets) are computed on the fly with the adapter disabled.
 
-    torchrun --nproc_per_node=8 scripts/train_lorra.py                       # all GPUs
-    CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 scripts/train_lorra.py   # a subset
-    python scripts/train_lorra.py --n-train 256 --epochs 1                   # single GPU
+    torchrun --nproc_per_node=8 scripts/training/train_lorra.py                       # all GPUs
+    CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 scripts/training/train_lorra.py   # a subset
+    python scripts/training/train_lorra.py --n-train 256 --epochs 1                   # single GPU
 
 Output: <out-dir>/ (merged, vLLM-loadable) and <out-dir>/adapter/, plus loss_log.json and lorra_config.json.
 The paper gives no rank/layers/alpha/data/steps, so those are config choices (RepE-style defaults).

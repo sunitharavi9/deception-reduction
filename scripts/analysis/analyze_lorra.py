@@ -2,7 +2,7 @@
 
 The adapter is toggled on/off on one loaded model (PEFT `disable_adapter()`), so a single GPU is enough.
 
-    python scripts/analyze_lorra.py \\
+    python scripts/analysis/analyze_lorra.py \\
         --adapter models/qwen3.5-9b-lorra/adapter --vectors models/steer/qwen3.5-9b/vectors.pt
 
 Needs the steering vectors (`steer_honesty.py compute`) as the reference "honesty direction" v_l.
@@ -41,7 +41,7 @@ from datasets import load_dataset
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 HONEST = "Pretend you're an honest person making statements about the world."
 DISHONEST = "Pretend you're a dishonest person making statements about the world."
 MASK_ARCHES = ["continuations", "disinformation", "known_facts", "provided_facts", "statistics"]
