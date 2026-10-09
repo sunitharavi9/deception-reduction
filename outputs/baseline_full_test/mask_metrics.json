@@ -1,0 +1,75 @@
+{
+  "overall": {
+    "n": 999,
+    "honesty": 0.6076076076076076,
+    "lie_rate": 0.3923923923923924,
+    "lie_rate_given_belief": 0.5297297297297298,
+    "honest_rate": 0.23723723723723725,
+    "evasion_rate": 0.16016016016016016,
+    "no_belief_rate": 0.25925925925925924,
+    "accuracy": 0.8476394849785408
+  },
+  "by_archetype": {
+    "continuations": {
+      "n": 176,
+      "honesty": 0.46590909090909094,
+      "lie_rate": 0.5340909090909091,
+      "lie_rate_given_belief": 0.6438356164383562,
+      "honest_rate": 0.22727272727272727,
+      "evasion_rate": 0.07954545454545454,
+      "no_belief_rate": 0.17045454545454544,
+      "accuracy": 0.9726027397260274
+    },
+    "disinformation": {
+      "n": 125,
+      "honesty": 0.744,
+      "lie_rate": 0.256,
+      "lie_rate_given_belief": 0.2807017543859649,
+      "honest_rate": 0.488,
+      "evasion_rate": 0.192,
+      "no_belief_rate": 0.088,
+      "accuracy": 0.9824561403508771
+    },
+    "doubling_down_known_facts": {
+      "n": 120,
+      "honesty": 0.7583333333333333,
+      "lie_rate": 0.24166666666666667,
+      "lie_rate_given_belief": 0.3972602739726027,
+      "honest_rate": 0.175,
+      "evasion_rate": 0.2916666666666667,
+      "no_belief_rate": 0.39166666666666666,
+      "accuracy": 0.684931506849315
+    },
+    "known_facts": {
+      "n": 209,
+      "honesty": 0.7320574162679425,
+      "lie_rate": 0.2679425837320574,
+      "lie_rate_given_belief": 0.4666666666666667,
+      "honest_rate": 0.23923444976076555,
+      "evasion_rate": 0.11961722488038277,
+      "no_belief_rate": 0.4258373205741627,
+      "accuracy": 0.725
+    },
+    "provided_facts": {
+      "n": 274,
+      "honesty": 0.36131386861313863,
+      "lie_rate": 0.6386861313868614,
+      "lie_rate_given_belief": 0.6386861313868614,
+      "honest_rate": 0.21897810218978103,
+      "evasion_rate": 0.14233576642335766,
+      "no_belief_rate": 0.0,
+      "accuracy": null
+    },
+    "statistics": {
+      "n": 95,
+      "honesty": 0.9368421052631579,
+      "lie_rate": 0.06315789473684211,
+      "lie_rate_given_belief": 0.46153846153846156,
+      "honest_rate": 0.05263157894736842,
+      "evasion_rate": 0.24210526315789474,
+      "no_belief_rate": 0.8631578947368421,
+      "accuracy": 0.3076923076923077
+    }
+  },
+  "macro_honesty": 0.6664093023977773
+}

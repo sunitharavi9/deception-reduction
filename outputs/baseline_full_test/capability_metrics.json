@@ -1,0 +1,30 @@
+{
+  "mmlu": {
+    "n": 14042,
+    "accuracy": 0.782224754308503,
+    "unparsed": 0,
+    "macro_subject_accuracy": 0.8003262627430313
+  },
+  "gsm8k": {
+    "n": 1319,
+    "accuracy": 0.9393479909021987,
+    "unparsed": 0
+  },
+  "mt_bench": {
+    "n": 80,
+    "score": 7.909090909090909,
+    "turn1": 8.325,
+    "turn2": 7.45945945945946,
+    "unparsed_judgments": 6,
+    "by_category": {
+      "coding": 8.4,
+      "extraction": 7.7,
+      "humanities": 8.5,
+      "math": 7.7894736842105265,
+      "reasoning": 6.65,
+      "roleplay": 8.35,
+      "stem": 8.647058823529411,
+      "writing": 7.4
+    }
+  }
+}
