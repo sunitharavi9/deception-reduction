@@ -67,7 +67,8 @@ def main():
         torch.cuda.set_device(local)
     if world > 1:
         # long timeout: rank 0 alone runs the sanity check and saves the merged model while the others wait
-        dist.init_process_group("nccl" if use_cuda else "gloo", timeout=timedelta(minutes=60))
+        dist.init_process_group("nccl" if use_cuda else "gloo", timeout=timedelta(minutes=60),
+                                device_id=dev if use_cuda else None)
     is_main = rank == 0
 
     def log(*m):
@@ -110,7 +111,7 @@ def main():
         f"global batch={a.global_batch} | {total} optimizer steps")
 
     # ---- model
-    model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.bfloat16 if use_cuda else torch.float32,
+    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16 if use_cuda else torch.float32,
                                                  device_map={"": dev.index if use_cuda else "cpu"})
     model.config.use_cache = False
     cfg = getattr(model.config, "text_config", model.config)
@@ -120,8 +121,16 @@ def main():
     assert max(EDIT) <= min(TARGET), "editable layers must come before the target layers"
     log(f"{N} layers | target layers {TARGET} | editable layers {EDIT[0]}..{EDIT[-1]}")
 
+    # PEFT forbids layers_to_transform with a string target_modules, so list the exact Linear modules of the
+    # editable decoder layers (works for Qwen3.5's mixed full-attention / linear-attention layers too)
+    prefix = next(n for n, m in model.named_modules()
+                  if isinstance(m, torch.nn.ModuleList) and len(m) == N and n.endswith("layers"))
+    layer_list = model.get_submodule(prefix)
+    targets = [f"{prefix}.{i}.{n}" for i in EDIT for n, m in layer_list[i].named_modules()
+               if isinstance(m, torch.nn.Linear)]
+    log(f"LoRA on {len(targets)} Linear modules in layers {EDIT[0]}..{EDIT[-1]} (e.g. {targets[0]}, {targets[-1]})")
     pm = get_peft_model(model, LoraConfig(r=a.lora_r, lora_alpha=a.lora_alpha, lora_dropout=a.lora_dropout,
-                                          target_modules="all-linear", layers_to_transform=EDIT, task_type="CAUSAL_LM"))
+                                          target_modules=targets, task_type="CAUSAL_LM"))
     if is_main:
         pm.print_trainable_parameters()
     params = [p for p in pm.parameters() if p.requires_grad]
