@@ -1,0 +1,7 @@
+# LoRRA training env (separate from the vLLM env). Install torch first, matched to the driver, e.g.:
+#   uv pip install torch --torch-backend=cu128
+#   uv pip install -r requirements-train.txt
+transformers>=5
+peft
+accelerate
+datasets

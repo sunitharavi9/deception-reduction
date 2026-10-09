@@ -114,5 +114,37 @@ python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B --bench mask --
 ```
 
 ### Experiment 2: LoRRA
-`notebooks/lorra_honesty.ipynb` trains LoRRA adapters on Qwen3.5-9B, merges them into `models/qwen3.5-9b-lorra`,
-and ends with the vLLM serve + eval commands.
+Trains LoRRA adapters on Qwen3.5-9B (MASK paper §5.2) and merges them into a vLLM-loadable checkpoint.
+`scripts/train_lorra.py` is data-parallel over all GPUs (the notebook `notebooks/lorra_honesty.ipynb` is the
+same recipe on a single GPU). Stop any vLLM servers first, since training takes the GPUs.
+
+```bash
+# one-time: separate training env (torch matched to the driver, e.g. CUDA 12.8)
+uv venv .venv-train --python 3.11 && source .venv-train/bin/activate
+uv pip install torch --torch-backend=cu128
+uv pip install -r requirements-train.txt
+
+# short trial first (~160 examples) to check it runs and read the time per step
+torchrun --standalone --nproc_per_node=8 scripts/train_lorra.py --n-train 160 --out-dir models/lorra_trial
+
+# full run: 8 GPUs, 5000 examples, effective batch 16 (~312 optimizer steps) -> models/qwen3.5-9b-lorra
+torchrun --standalone --nproc_per_node=8 scripts/train_lorra.py
+```
+Use `CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --standalone --nproc_per_node=4 ...` for a subset of GPUs. The global batch
+must be divisible by `--micro-batch` x number of GPUs (defaults: 16 and 2, so 1, 2, 4 or 8 GPUs). Rank 0 prints the loss
+every 10 steps, then a held-out sanity check (the cosine should be clearly positive), and saves the merged model plus
+`adapter/`, `loss_log.json` and `lorra_config.json` in `--out-dir`. Config choices (alpha, layers, rank, data) are in
+`python scripts/train_lorra.py --help`; the paper does not specify them.
+
+Evaluate the merged model with the same judge as the baseline:
+```bash
+# model under test on GPUs 0-5
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vllm serve models/qwen3.5-9b-lorra --served-model-name qwen3.5-9b-lorra \
+  --port 8000 --data-parallel-size 6 --gpu-memory-utilization 0.90 --max-model-len 16384
+# judge on GPUs 6-7 (see "Running the model and a separate judge together" for the judge command)
+
+python scripts/run_evals.py --split test --model qwen3.5-9b-lorra --base-url http://localhost:8000/v1 \
+  --judge-model mistralai/Mistral-Small-3.2-24B-Instruct-2506 --judge-base-url http://localhost:8001/v1 \
+  --concurrency 96 --mach-workers 30 --out outputs/lorra_full_test
+```
+Smoke test first with `--split dev --limit 5 --bench mask mmlu`.
