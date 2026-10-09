@@ -73,7 +73,9 @@ class LLM:
 
     def chat(self, messages, temperature=None, max_tokens=None):
         """Returns the assistant text with any <think> block removed."""
-        extra = {"chat_template_kwargs": {"enable_thinking": self.thinking}}
+        # enable_thinking is a Qwen chat-template switch; other models (e.g. Mistral tokenizers) reject it
+        extra = ({"chat_template_kwargs": {"enable_thinking": self.thinking}}
+                 if "qwen" in self.model.lower() else None)
         last = None
         for _ in range(self.retries):
             try:
