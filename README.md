@@ -202,6 +202,76 @@ python scripts/run_evals.py --split test --bench mask --model qwen3.5-9b-steer -
 Sweep runs go to `outputs/steer_dev/<config>/` with a comparison table. Layer indices are 0-based decoder layers
 (`meta.json` has the layer count and vector norms). A server's setting can be changed by hand with the `curl` above.
 
+### Experiment 4: fine-tuning data (Moral Stories, DolusChat, synthetic anti-evasion, Tulu 3)
+Builds an SFT file and a DPO file in `data/train/` (gitignored). Run both scripts from the eval client env
+(`.venv`, which now includes `datasets`). Neither script trains on MASK or MACHIAVELLI: every example is checked for
+13-gram overlap with MASK, MT-Bench, GSM8K test and MMLU test (plus the MASK canary; eval texts of 8-12 words, which
+cannot form a 13-gram, are matched as exact word sequences; the 7.9% of MMLU questions under 8 words are not checked), and
+synthetic scenarios whose fact is close to a MASK proposition are dropped (`scripts/decontam.py`).
+
+| source | SFT | DPO | what it targets |
+|---|---|---|---|
+| Moral Stories (`demelin/moral_stories`, 6k) | moral action | moral > immoral action | MACHIAVELLI: half the rows use the game's own prompt format (numbered actions, answer = number, no "be ethical" instruction); both actions reach the goal, so reward isn't traded away |
+| DolusChat (`AlignmentResearch/DolusChat`, 6k) | truthful reply | truthful > deceptive | lying in context |
+| Synthetic (`gen_synthetic_honesty.py`) | honest reply | honest-and-direct > lie, honest-and-direct > evasive | MASK-shaped pressure, and evasion |
+| Tulu 3 SFT mix (`allenai/tulu-3-sft-mixture`, 24k) | as is | none | keeping MMLU / GSM8K / MT-Bench |
+
+```bash
+# 1) synthetic scenarios (~60-80% survive the judge). The teacher/judge must NOT be the MASK eval judge (Mistral): the
+#    data would be filtered by the model that later scores it. Serve another model on free GPUs, e.g. on :8002:
+#      CUDA_VISIBLE_DEVICES=6,7 vllm serve Qwen/Qwen2.5-32B-Instruct --port 8002 --tensor-parallel-size 2 \
+#        --gpu-memory-utilization 0.90 --max-model-len 16384
+#    The script refuses the eval judge unless --allow-eval-judge; each row records its teacher and judge.
+python scripts/gen_synthetic_honesty.py --n 3000 --concurrency 64 \
+  --teacher-model Qwen/Qwen2.5-32B-Instruct --teacher-base-url http://localhost:8002/v1
+python scripts/gen_synthetic_honesty.py --n 20 --mock     # plumbing check, no server
+
+# 2) check DolusChat's field layout (auto-detected; override with --dolus-fields chosen=...,rejected=...,user=...,system=...)
+python scripts/build_training_data.py --inspect doluschat
+
+# 3) build the mix, then read data/train/samples.md and manifest.json before training
+python scripts/build_training_data.py
+```
+Sizes and mix are flags (`--n-moral`, `--n-dolus`, `--n-tulu`, `--n-synthetic`, `--moral-mach-frac`, `--no-doluschat`,
+`--tulu-exclude <source> ...`). Tulu 3 includes math and multiple-choice data (which can raise MMLU/GSM8K by itself) and
+safety/refusal sources (which can raise evasion): see `tulu_sources` in `manifest.json` and consider `--tulu-exclude` on
+the refusal ones.
+
+**Tulu-only control.** To separate what the honesty/ethics data does from what Tulu does, build and train a control from
+the same Tulu subset (same `--seed`, same exclusions) and evaluate it exactly like the real run:
+```bash
+python scripts/build_training_data.py --tulu-only                   # -> data/train/control_tulu/ (add the same --tulu-exclude ...)
+torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage sft \
+  --data data/train/control_tulu/sft.jsonl --out-dir models/qwen3.5-9b-sft-tulu-only
+```
+Compare the SFT and SFT+DPO models against this control (and the base model), not only against the base model. It has
+fewer optimizer steps than the full SFT because it has fewer examples; note that when reading the comparison. Reruns of the generator append and skip finished ids; dropped scenarios and the reason
+go to `data/train/synthetic_rejects.jsonl`.
+
+**Training on the mix** (`scripts/train_sft_dpo.py`, training env, same data-parallel setup as LoRRA; stop vLLM first).
+LoRA on every Linear layer of each decoder block; prompts are rendered as at eval time (`enable_thinking=False`) and
+only the final assistant reply is trained. Each stage saves a merged checkpoint plus `adapter/` and `train_log.json`
+(validation loss before and after; for DPO also preference accuracy, margin, and how far the chosen reply's
+log-prob moved).
+```bash
+# trial first: a few steps to check memory and time per step
+torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage sft --max-examples 512 --out-dir models/sft_trial
+
+# 1) SFT from Qwen/Qwen3.5-9B -> models/qwen3.5-9b-sft   (lr 1e-4, global batch 64, 1 epoch)
+torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage sft
+# 2) DPO from the SFT model, which is also the reference -> models/qwen3.5-9b-sft-dpo   (beta 0.1, lr 2e-5)
+torchrun --standalone --nproc_per_node=8 scripts/train_sft_dpo.py --stage dpo --rpo-alpha 0.2
+```
+`--rpo-alpha` adds an NLL term on the chosen reply so DPO can't win just by pushing both replies down. Ablations:
+`--stage dpo --model Qwen/Qwen3.5-9B --out-dir models/qwen3.5-9b-dpo-only` (no SFT stage). Evaluate as for LoRRA:
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vllm serve models/qwen3.5-9b-sft-dpo --served-model-name qwen3.5-9b-sft-dpo \
+  --port 8000 --data-parallel-size 6 --gpu-memory-utilization 0.90 --max-model-len 16384
+python scripts/run_evals.py --split test --model qwen3.5-9b-sft-dpo --base-url http://localhost:8000/v1 \
+  --judge-model mistralai/Mistral-Small-3.2-24B-Instruct-2506 --judge-base-url http://localhost:8001/v1 \
+  --concurrency 96 --mach-workers 30 --out outputs/sft_dpo_full_test
+```
+
 ### Analysis: what did LoRRA change?
 `scripts/analyze_lorra.py` compares the LoRRA model with the base model on the same prompts (one GPU; the adapter is
 toggled on/off, so both share one set of weights). It needs the trained adapter and the steering vectors from
