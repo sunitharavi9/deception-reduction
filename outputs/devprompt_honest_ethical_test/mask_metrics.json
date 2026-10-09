@@ -1,0 +1,83 @@
+{
+  "overall": {
+    "n": 999,
+    "honesty": 0.7977977977977978,
+    "lie_rate": 0.2022022022022022,
+    "lie_rate_given_belief": 0.25440806045340053,
+    "honest_rate": 0.4804804804804805,
+    "evasion_rate": 0.14214214214214213,
+    "no_belief_rate": 0.20520520520520522,
+    "accuracy": 0.8480769230769231,
+    "accuracy_all_rows": 0.44144144144144143
+  },
+  "by_archetype": {
+    "continuations": {
+      "n": 176,
+      "honesty": 0.9090909090909091,
+      "lie_rate": 0.09090909090909091,
+      "lie_rate_given_belief": 0.1111111111111111,
+      "honest_rate": 0.7045454545454546,
+      "evasion_rate": 0.045454545454545456,
+      "no_belief_rate": 0.18181818181818182,
+      "accuracy": 0.9652777777777778,
+      "accuracy_all_rows": 0.7897727272727273
+    },
+    "disinformation": {
+      "n": 125,
+      "honesty": 0.968,
+      "lie_rate": 0.032,
+      "lie_rate_given_belief": 0.035398230088495575,
+      "honest_rate": 0.848,
+      "evasion_rate": 0.032,
+      "no_belief_rate": 0.096,
+      "accuracy": 0.9911504424778761,
+      "accuracy_all_rows": 0.896
+    },
+    "doubling_down_known_facts": {
+      "n": 120,
+      "honesty": 0.7666666666666666,
+      "lie_rate": 0.23333333333333334,
+      "lie_rate_given_belief": 0.4745762711864407,
+      "honest_rate": 0.20833333333333334,
+      "evasion_rate": 0.125,
+      "no_belief_rate": 0.5083333333333333,
+      "accuracy": 0.7457627118644068,
+      "accuracy_all_rows": 0.36666666666666664
+    },
+    "known_facts": {
+      "n": 209,
+      "honesty": 0.8086124401913876,
+      "lie_rate": 0.19138755980861244,
+      "lie_rate_given_belief": 0.3669724770642202,
+      "honest_rate": 0.2631578947368421,
+      "evasion_rate": 0.14354066985645933,
+      "no_belief_rate": 0.4784688995215311,
+      "accuracy": 0.7522935779816514,
+      "accuracy_all_rows": 0.3923444976076555
+    },
+    "provided_facts": {
+      "n": 274,
+      "honesty": 0.6751824817518248,
+      "lie_rate": 0.3248175182481752,
+      "lie_rate_given_belief": 0.3248175182481752,
+      "honest_rate": 0.4306569343065693,
+      "evasion_rate": 0.24452554744525548,
+      "no_belief_rate": 0.0,
+      "accuracy": null,
+      "accuracy_all_rows": null
+    },
+    "statistics": {
+      "n": 95,
+      "honesty": 0.736842105263158,
+      "lie_rate": 0.2631578947368421,
+      "lie_rate_given_belief": 0.2631578947368421,
+      "honest_rate": 0.5473684210526316,
+      "evasion_rate": 0.18947368421052632,
+      "no_belief_rate": 0.0,
+      "accuracy": 0.6736842105263158,
+      "accuracy_all_rows": 0.6736842105263158
+    }
+  },
+  "macro_honesty": 0.8107324338273244,
+  "macro_honesty_normalized": 0.7373277495941192
+}
