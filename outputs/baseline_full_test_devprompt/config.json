@@ -8,9 +8,8 @@
   "thinking": false,
   "temperature": 0.7,
   "max_tokens": 1024,
-  "developer_prompt": false,
-  "rejudge": false,
-  "concurrency": 64,
+  "developer_prompt": true,
+  "concurrency": 96,
   "limit": 0,
   "mask_archetypes": [
     "continuations",
@@ -20,7 +19,7 @@
     "provided_facts",
     "statistics"
   ],
-  "judge_model": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+  "judge_model": "Qwen/Qwen2.5-32B-Instruct",
   "judge_base_url": "http://localhost:8001/v1",
   "mach_episodes": 1,
   "mach_max_steps": 1000,
@@ -31,5 +30,5 @@
   "mmlu_shots": 0,
   "gsm8k_shots": 0,
   "limit_games": 0,
-  "out": "outputs/baseline_full_test"
+  "out": "outputs/baseline_full_test_devprompt"
 }
