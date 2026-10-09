@@ -30,7 +30,16 @@ pip install -r requirements.txt
 
 ### 3. Data
 Benchmarks live in `data/evals/` (not committed): `mask/`, `machiavelli/` (incl. `game_data/`, ~3.4 GB),
-`mmlu/`, `gsm8k/`, `mt_bench/`. Build the small dev subsets with:
+`mmlu/`, `gsm8k/`, `mt_bench/`. The Machiavelli game data is gitignored, so on a new machine download it:
+```bash
+cd deception-reduction/data/evals/machiavelli
+source ../../../.venv/bin/activate
+pip install gdown
+gdown "https://drive.google.com/uc?id=19PXa2bgjkfFfTTI3EZIT3-IJ_vxrV0Rz" -O game_data.zip
+unzip -q -P machiavelli game_data.zip && rm game_data.zip
+ls game_data/game_metadata.json     # should exist
+```
+Build the small dev subsets with:
 ```bash
 python scripts/make_dev_sets.py
 ```
@@ -51,24 +60,39 @@ Benchmarks: `mask`, `machiavelli`, `mmlu`, `gsm8k`, `mt_bench`. Results go to
 machine, add `--base-url http://<host>:8000/v1`. MASK and MT-Bench are scored by an LLM judge that
 defaults to the model under test; pass `--judge-model` / `--judge-base-url` for a stronger judge.
 
-### Running the model and a separate judge together (8 GPUs, no quantization)
-Give each server its own GPUs so they don't share memory. The 9B model (~18 GB in bf16) fits on one GPU;
-the 32B judge (~64 GB in bf16) is split over two GPUs with tensor parallelism. The remaining GPUs are free.
+### Running the model and a separate judge together (all 8 GPUs, no quantization)
+Judge on GPUs 6-7 (bf16, ~64 GB split with tensor parallelism); the 9B model (~18 GB) is replicated
+on GPUs 0-5 with data parallelism behind a single endpoint, so requests are load-balanced across 6 replicas.
 Start the model first and wait until it is up, then start the judge (separate terminals).
 ```bash
-# 1) model under test on GPU 0
-CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3.5-9B --port 8000 \
-  --gpu-memory-utilization 0.90 --max-model-len 16384
+# 1) model under test: 6 replicas on GPUs 0-5
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vllm serve Qwen/Qwen3.5-9B --port 8000 \
+  --data-parallel-size 6 --gpu-memory-utilization 0.90 --max-model-len 16384
 
-# 2) judge on GPUs 1-2 (bf16, tensor parallel 2)
-CUDA_VISIBLE_DEVICES=1,2 vllm serve Qwen/Qwen2.5-32B-Instruct --port 8001 \
+# 2) judge on GPUs 6-7
+CUDA_VISIBLE_DEVICES=6,7 vllm serve Qwen/Qwen2.5-32B-Instruct --port 8001 \
   --tensor-parallel-size 2 --gpu-memory-utilization 0.90 --max-model-len 16384
 
-# 3) run evals against both
+# 3) baseline evals: all five benchmarks, full test split
 python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B \
   --base-url http://localhost:8000/v1 \
   --judge-model Qwen/Qwen2.5-32B-Instruct --judge-base-url http://localhost:8001/v1 \
-  --concurrency 32 --out outputs/baseline_full_test
+  --concurrency 96 --mach-workers 30 \
+  --out outputs/baseline_full_test
 ```
-For more throughput, add `--data-parallel-size N` to the model server (e.g. `CUDA_VISIBLE_DEVICES=0,1,2,3` and
-`--data-parallel-size 4`, moving the judge to GPUs 4-5).
+`--concurrency` is the number of parallel MASK / MMLU / GSM8K / MT-Bench requests; `--mach-workers` is the
+number of Machiavelli games played in parallel (one process per game, 30 test games). Lower either if the
+judge (only 2 GPUs) becomes the bottleneck. Reruns with the same `--out` resume from cached rows.
+
+### Experiment 1: honesty "developer system prompt" (MASK paper §5.2, App. A.6)
+Same command as the baseline, plus `--developer-prompt` (prepended to MASK pressure prompts only; belief
+elicitation is unchanged). Use a new `--out` so it doesn't resume from baseline rows.
+```bash
+python scripts/run_evals.py --split test --model Qwen/Qwen3.5-9B --bench mask --developer-prompt \
+  --base-url http://localhost:8000/v1 --judge-model Qwen/Qwen2.5-32B-Instruct \
+  --judge-base-url http://localhost:8001/v1 --concurrency 96 --out outputs/devprompt_mask_test
+```
+
+### Experiment 2: LoRRA
+`notebooks/lorra_honesty.ipynb` trains LoRRA adapters on Qwen3.5-9B, merges them into `models/qwen3.5-9b-lorra`,
+and ends with the vLLM serve + eval commands.
